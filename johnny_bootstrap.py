@@ -42,6 +42,19 @@ def parse_category(category):
 
     return mo.group("group", "subgroup", "folder")
 
+# from https://stackoverflow.com/questions/1868714/how-do-i-copy-an-entire-directory-of-files-into-an-existing-directory-using-pyth
+def copytree(src, dst, symlinks=False, ignore=None):
+    if not os.path.exists(dst):
+        os.makedirs(dst)
+    for item in os.listdir(src):
+        s = os.path.join(src, item)
+        d = os.path.join(dst, item)
+        if os.path.isdir(s):
+            copytree(s, d, symlinks, ignore)
+        else:
+            if not os.path.exists(d) or os.stat(s).st_mtime - os.stat(d).st_mtime > 1:
+                shutil.copy2(s, d)
+
 # 
 # for input, expected in testcases:
 #     actual = parse_category(input)
@@ -67,12 +80,17 @@ def find_elements(element, typ):
 
     return results
 
-
+year_re = re.compile(r'((19[789]\d)|(20[01]\d))')
 
 class Path(object):
     def __init__(self, filename, timestamp, is_directory, action, category):
         self.filename=filename
-        self.timestamp=timestamp
+
+        mo = year_re.search(filename)
+        if mo:
+            self.timestamp = datetime.datetime(year=int(mo.group(1)), month=1, day=1)
+        else:
+            self.timestamp=timestamp
         self.is_directory=is_directory
         self.action=action
         self.category=category
@@ -173,7 +191,7 @@ filetable.content = [ e.row() for e in elements ]
 groups = {}
 # even simpler with defaultdict 
 for e in elements:
-    if e.action == 'k':
+    if e.action in ['k', 'K']:
         group = groups.setdefault(e.group, {})
         subgroup = group.setdefault(e.subgroup, {})
         subgroup.setdefault(e.folder, [0, e.timestamp])    
@@ -219,18 +237,33 @@ doc.save_to_file(tmpfile)
 shutil.move(tmpfile, args.file)
 
 if args.copy:
-    for e in [el for el in elements if el.action == 'k']:
+    for e in [el for el in elements if el.action in ['k', 'K'] ]:
         if not e.category_complete():
             print "SKIPPING %s because a complete target has not been set" % e.filename
         else:
             src = os.path.join(props['sourcedir'], e.filename)
 
             if e.is_directory:
-                dst = os.path.join(props['targetdir'], categories[e.category])
+
+                if e.action == 'k':
+                    # folder is copied as subdir to the new folder
+
+                    head, subdir = os.path.split(e.filename)
+                    if subdir == '': # if there is a trailing slash then the last
+                        head, subdir = os.path.split(head)
+
+                    dst = os.path.join(props['targetdir'], categories[e.category], subdir)
+                    print (props['targetdir'], categories[e.category], subdir)
+                elif e.action == 'K':
+                    #  folder becomes the new folder
+                    dst = os.path.join(props['targetdir'], categories[e.category])
+
+                else:
+                    raise Exception("Internal error - unknown action: %s" % e.action)
                 print "%s -> %s" % (src, dst)
 
                 if args.no_dry_run:
-                    shutil.copytree(src, dst)
+                    copytree(src, dst)
             else:
                 dst = os.path.join(props['targetdir'], categories[e.category], os.path.basename(e.filename))
                 
