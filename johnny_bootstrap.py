@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import argparse
+import codecs
 import datetime
 import os.path
 import re
@@ -9,6 +10,12 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "PyOrgMode"))
 
 from PyOrgMode import PyOrgMode
+
+# work around issues with output encoding in the Windows terminal
+if sys.stdout.encoding != 'UTF-8':
+  sys.stdout = codecs.getwriter('UTF-8')(sys.stdout, 'strict')
+if sys.stderr.encoding != 'UTF-8':
+  sys.stderr = codecs.getwriter('UTF-8')(sys.stderr, 'strict')
 
 parser = argparse.ArgumentParser(description='Process an org mode for Johnny Decimal organization of files.')
 parser.add_argument('file', help='the source file to process')
