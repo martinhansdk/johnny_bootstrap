@@ -91,6 +91,7 @@ class Path(object):
             self.timestamp = datetime.datetime(year=int(mo.group(1)), month=1, day=1)
         else:
             self.timestamp=timestamp
+
         self.is_directory=is_directory
         self.action=action
         self.category=category
@@ -181,13 +182,14 @@ else:
 #  then by  date (not time)
 #  then by  filename
 def make_sortkey(e):
-    return (e.action=='d', e.group, e.subgroup, e.folder, e.is_directory, e.timestamp, e.filename)
+  return (e.action=='d', e.group, e.subgroup, e.folder, e.is_directory, e.timestamp, e.filename)
 
 elements.sort(key=make_sortkey)
 
 filetable.content = [ e.row() for e in elements ]
 
-# Build the category tree of all files with action k
+
+# Build the category tree of all files with action k or K
 groups = {}
 # even simpler with defaultdict 
 for e in elements:
