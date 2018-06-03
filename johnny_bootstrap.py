@@ -21,6 +21,7 @@ parser = argparse.ArgumentParser(description='Process an org mode for Johnny Dec
 parser.add_argument('file', help='the source file to process')
 parser.add_argument('--copy', action='store_true', default=False, help='do the copying')
 parser.add_argument('--no-dry-run', action='store_true', default=False, help='actually do the copying')
+parser.add_argument('--force', action='store_true', default=False, help='copy files in spite of warnings')
 
 args = parser.parse_args()
 
@@ -82,15 +83,20 @@ def find_elements(element, typ):
 
 year_re = re.compile(r'((19[789]\d)|(20[01]\d))')
 
+def get_timestamp_from_string(s, default):
+    mo = year_re.search(s)
+    if mo:
+        return datetime.datetime(year=int(mo.group(1)), month=1, day=1)
+    else:
+        return default
+
 class Path(object):
     def __init__(self, filename, timestamp, is_directory, action, category):
         self.filename=filename
 
-        mo = year_re.search(filename)
-        if mo:
-            self.timestamp = datetime.datetime(year=int(mo.group(1)), month=1, day=1)
-        else:
-            self.timestamp=timestamp
+        self.timestamp = get_timestamp_from_string(
+                            category,
+                            get_timestamp_from_string(filename, timestamp))
 
         self.is_directory=is_directory
         self.action=action
@@ -117,6 +123,17 @@ class Path(object):
 
     def category_complete(self):
         return "" not in [self.group, self.subgroup, self.folder]
+
+    def check(self):
+        if self.action not in 'kKd':
+            return "Action must be k, K or d for copying: %s" % self.filename
+        if self.action != 'd' and not self.category_complete():
+            return "Category not completely specified: %s" % self.filename            
+        if self.action == 'd' and self.category != '':
+            return "Action is delete, but category is non-empty: %s" % self.filename
+
+        return None
+
 
 properties=find_elements(doc.root, PyOrgMode.OrgDrawer.Property)
 
@@ -170,8 +187,38 @@ else:
                                     action=action,
                                     category=category))
             else:
-               print "Entry disappeared: ", fabs
+               warn("Entry disappeared: %s" % fabs)
             
+
+# look at the disk and see if there are any files not mentioned in the table
+# add those to the list
+existing_files = set([e.filename for e in elements])
+
+def find_new_files(relpath, existing_files):
+    abspath = os.path.join(props['sourcedir'], relpath)
+
+    result=[]
+    for f in os.listdir(abspath):
+        frel = os.path.join(relpath, f)
+        fabs = os.path.join(abspath, f)
+
+        if os.path.isdir(fabs):
+            if frel+'\\' not in existing_files:
+                result.extend(find_new_files(frel, existing_files))
+        else:
+            if frel not in existing_files:
+                path = Path(filename=frel,
+                            timestamp=datetime.datetime.fromtimestamp(os.path.getmtime(fabs)),
+                            is_directory=os.path.isdir(fabs),
+                            action='u',
+                            category='')
+                result.append(path)
+
+    return result
+
+new_files = find_new_files('', existing_files)
+elements.extend(new_files)
+
 
 # sort the list
 #  first by if it will be deleted or not
@@ -239,6 +286,19 @@ doc.save_to_file(tmpfile)
 shutil.move(tmpfile, args.file)
 
 if args.copy:
+    # check input
+    warnings = 0
+    for e in elements:
+        warning = e.check()
+
+        if warning is not None:
+            print "WARNING: %s" % warning
+            warnings += 1
+
+    if warnings > 0 and not args.force:
+        print "ERROR: Refusing to copy files because there were warnings. Fix or use --force."
+        sys.exit(1)
+
     for e in [el for el in elements if el.action in ['k', 'K'] ]:
         if not e.category_complete():
             print "SKIPPING %s because a complete target has not been set" % e.filename
