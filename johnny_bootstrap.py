@@ -19,7 +19,7 @@ if sys.stderr.encoding != 'UTF-8':
 
 parser = argparse.ArgumentParser(description='Process an org mode for Johnny Decimal organization of files.')
 parser.add_argument('file', help='the source file to process')
-parser.add_argument('--minimum-groupspace', action='store', default=10, type=int, help='number the groups such that the minimum number of unallocated subgroups is at least this many to allow for future additions. Default: %default')
+parser.add_argument('--minimum-groupspace', action='store', default=10, type=int, help='The minimum number of unallocated subgroups must be at least this many to allow for future additions. Default: %default')
 parser.add_argument('--copy', action='store_true', default=False, help='do the copying')
 parser.add_argument('--no-dry-run', action='store_true', default=False, help='actually do the copying')
 parser.add_argument('--force', action='store_true', default=False, help='copy files in spite of warnings')
@@ -150,6 +150,8 @@ props={}
 for p in properties:
     props[p.name]=unicode(p.value)
 
+subgroups_per_group=int(props['subgroups-per-group'])
+    
 def get_files(relpath, category):
     abspath = os.path.join(props['sourcedir'], relpath)
     print "recursing into %s" % abspath
@@ -269,20 +271,19 @@ def dt(t):
         return "(uncategorized)"
     return t
 
-gid = 10
+gid = subgroups_per_group
 categories=dict() # maps categories to target directories
 for group in sorted(groups.keys()):
     sgid = gid - 1
 
     subgroups=len(groups[group].keys())
 
-    # fixme, there must be a more clever way to calculate this, but
-    # I'm tired right now and this is readable
-    groupsize=10
-    while (groupsize-subgroups) < args.minimum_groupspace:
-      groupsize += 10
+    if (subgroups_per_group-subgroups) < args.minimum_groupspace:
+      warn(("Group '%s' has %d subgroups, but that means that there is less than %d spare places for future additions.\n"+
+           "Fix this by reorganizing the groups, increasing the subgroups-per-group setting in %s or by decreasing the --minimum-groupspace option.") %
+           (group, subgroups, args.minimum_groupspace, args.file))
     
-    groupname = "%d-%d %s" % (gid, gid+groupsize-1, dt(group))
+    groupname = "%d-%d %s" % (gid, gid+subgroups_per_group-1, dt(group))
     doc.root.append_clean(" * %s\n" % groupname)
     for subgroup in sorted(groups[group].keys()):
         sgid += 1
@@ -299,7 +300,7 @@ for group in sorted(groups.keys()):
             targetdir = os.sep.join([groupname, subgroupname, foldername])
             categories[category]=targetdir
 
-    gid += groupsize
+    gid += subgroups_per_group
 
             
 tmpfile=args.file+'.tmp'
