@@ -19,12 +19,19 @@ if sys.stderr.encoding != 'UTF-8':
 
 parser = argparse.ArgumentParser(description='Process an org mode for Johnny Decimal organization of files.')
 parser.add_argument('file', help='the source file to process')
+parser.add_argument('--minimum-groupspace', action='store', default=10, type=int, help='number the groups such that the minimum number of unallocated subgroups is at least this many to allow for future additions. Default: %default')
 parser.add_argument('--copy', action='store_true', default=False, help='do the copying')
 parser.add_argument('--no-dry-run', action='store_true', default=False, help='actually do the copying')
 parser.add_argument('--force', action='store_true', default=False, help='copy files in spite of warnings')
 
 args = parser.parse_args()
 
+
+warnings=0
+def warn(msg):
+  global warnings
+  warnings += 1
+  print "WARNING: %s" % msg
 
 
 # calculate the group, subgroup, folder vars from the category as
@@ -53,7 +60,9 @@ def copytree(src, dst, symlinks=False, ignore=None):
         if os.path.isdir(s):
             copytree(s, d, symlinks, ignore)
         else:
-            if not os.path.exists(d) or os.stat(s).st_mtime - os.stat(d).st_mtime > 1:
+            if os.path.exists(d):
+                raise Exception("File already exists, can't copy %s -> %s" % (s, d))
+            else:
                 shutil.copy2(s, d)
 
 # 
@@ -260,18 +269,27 @@ def dt(t):
         return "(uncategorized)"
     return t
 
-gid = 0
+gid = 10
 categories=dict() # maps categories to target directories
 for group in sorted(groups.keys()):
-    gid += 10
     sgid = gid - 1
-    groupname = "%d-%d %s" % (gid, gid+9, dt(group))
+
+    subgroups=len(groups[group].keys())
+
+    # fixme, there must be a more clever way to calculate this, but
+    # I'm tired right now and this is readable
+    groupsize=10
+    while (groupsize-subgroups) < args.minimum_groupspace:
+      groupsize += 10
+    
+    groupname = "%d-%d %s" % (gid, gid+groupsize-1, dt(group))
     doc.root.append_clean(" * %s\n" % groupname)
     for subgroup in sorted(groups[group].keys()):
         sgid += 1
         fid = 0
         subgroupname = "%d %s" % (sgid, dt(subgroup))
         doc.root.append_clean("   * %s\n" % subgroupname)
+
         for folder in sorted(groups[group][subgroup].keys(), key=lambda f: groups[group][subgroup][f][1]):
             fid += 1
             foldername =  "%d.%02d %s" % (sgid, fid, dt(folder))
@@ -281,19 +299,20 @@ for group in sorted(groups.keys()):
             targetdir = os.sep.join([groupname, subgroupname, foldername])
             categories[category]=targetdir
 
+    gid += groupsize
+
+            
 tmpfile=args.file+'.tmp'
 doc.save_to_file(tmpfile)
 shutil.move(tmpfile, args.file)
 
 if args.copy:
     # check input
-    warnings = 0
     for e in elements:
         warning = e.check()
 
         if warning is not None:
-            print "WARNING: %s" % warning
-            warnings += 1
+            warn("WARNING: %s" % warning)
 
     if warnings > 0 and not args.force:
         print "ERROR: Refusing to copy files because there were warnings. Fix or use --force."
