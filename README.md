@@ -38,10 +38,10 @@ Keep editing the table and pressing F5 until you are satisfied with the categori
 
 Do a dry-run of the script from a command line:
 
-   python johnny_bootstrap.py organize_files.org --copy
+    python johnny_bootstrap.py organize_files.org --copy
    
 When satisfied, run the actual copy:
   
-   python johnny_bootstrap.py organize_files.org --copy --no-dry-run
+    python johnny_bootstrap.py organize_files.org --copy --no-dry-run
    
 This does not touch the original files but simply makes a copy into the new location. Regardless, use at your own risk and make sure yoy have backups.
