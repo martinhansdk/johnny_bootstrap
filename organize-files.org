@@ -1,0 +1,21 @@
+;;; -*- coding: utf-8 -*-
+
+* Organize files
+:PROPERTIES:
+:sourcedir: D:\Documents
+:targetdir: D:\New-Documents
+:subgroups-per-group: 10
+:END:
+
+Supported actions:
+ - u :: uncategorized
+ - k :: keep - files are copied into the new folder, folders are copied as subdirs in the new folder
+ - K :: keep - files are copied into the new folder, folders become the new folder
+ - r :: recurse - expand the contents of this folder in the table
+ - d :: delete - do not copy
+
+
+|   |   |   |
+
+
+* Category tree
