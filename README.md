@@ -6,6 +6,8 @@ file or directory and tell say what the script should do with it. A sample org-m
 
 How to use:
 
+*Use at your own risk and make sure to have backups before starting.*
+
 Put the following in your .emacs file to cause F5 to run the script and update the contents of the table, edit the paths to match:
 
 ```
@@ -44,4 +46,4 @@ When satisfied, run the actual copy:
   
     python johnny_bootstrap.py organize_files.org --copy --no-dry-run
    
-This does not touch the original files but simply makes a copy into the new location. Regardless, use at your own risk and make sure yoy have backups.
+This does not touch the original files but simply makes a copy into the new location. 
