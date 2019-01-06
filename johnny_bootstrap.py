@@ -5,6 +5,7 @@ import datetime
 import os.path
 import re
 import shutil
+import string
 import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "PyOrgMode"))
@@ -19,7 +20,7 @@ if sys.stderr.encoding != 'UTF-8':
 
 parser = argparse.ArgumentParser(description='Process an org mode for Johnny Decimal organization of files.')
 parser.add_argument('file', help='the source file to process')
-parser.add_argument('--minimum-groupspace', action='store', default=10, type=int, help='The minimum number of unallocated subgroups must be at least this many to allow for future additions. Default: %default')
+parser.add_argument('--minimum-groupspace', action='store', default=10, type=int, help='The minimum number of unallocated subgroups must be at least this many to allow for future additions. Default: %(default)s')
 parser.add_argument('--copy', action='store_true', default=False, help='do the copying')
 parser.add_argument('--no-dry-run', action='store_true', default=False, help='actually do the copying')
 parser.add_argument('--force', action='store_true', default=False, help='copy files in spite of warnings')
@@ -90,6 +91,7 @@ def find_elements(element, typ):
 
     return results
 
+date_re = re.compile(r'\[(\d{4})-(\d{2})-(\d{2})\]')
 year_re = re.compile(r'((19[789]\d)|(20[01]\d))')
 
 def get_timestamp_from_string(s, default):
@@ -99,13 +101,31 @@ def get_timestamp_from_string(s, default):
     else:
         return default
 
+def get_timestamp(category, filename, default):
+    timestamp=default
+    clean_category=category
+    timestamp_specifier=''
+
+    mo1 = date_re.search(category)
+    mo2 = year_re.search(category)
+    mo3 = year_re.search(filename)        
+    if mo1:
+        timestamp = datetime.datetime(year=int(mo1.group(1)), month=int(mo1.group(2)), day=int(mo1.group(3)))
+        clean_category=string.strip(date_re.sub('', category))
+        timestamp_specifier='  '+mo1.group(0)
+    elif mo2:
+        timestamp = datetime.datetime(year=int(mo2.group(1)), month=1, day=1)
+    elif mo3:
+        timestamp = datetime.datetime(year=int(mo3.group(1)), month=1, day=1)
+
+    return timestamp, clean_category, timestamp_specifier
+      
+      
 class Path(object):
     def __init__(self, filename, timestamp, is_directory, action, category):
         self.filename=filename
 
-        self.timestamp = get_timestamp_from_string(
-                            category,
-                            get_timestamp_from_string(filename, timestamp))
+        self.timestamp, category, self.timestamp_specifier = get_timestamp( category, filename, timestamp)
 
         self.is_directory=is_directory
         self.action=action
@@ -128,7 +148,7 @@ class Path(object):
         if self.is_directory and not self.filename.endswith(os.sep):
             fname += os.sep
         
-        return [self.category, self.action, fname]
+        return [self.category+self.timestamp_specifier, self.action, fname]
 
     def category_complete(self):
         return "" not in [self.group, self.subgroup, self.folder]
