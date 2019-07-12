@@ -12,8 +12,7 @@ Put the following in your .emacs file to cause F5 to run the script and update t
 
 ```
 (defun johnny-organize-buffer ()
-  "Asks for a command and executes it in inferior shell with current buffer
-as input."
+  "Saves the buffer, runs johnny_boootstrap.py on it, loads the new version of it into the buffer and attempts to put the cursor back to where it was."
   (interactive)
   (save-buffer)
   (let ((line (line-number-at-pos))
